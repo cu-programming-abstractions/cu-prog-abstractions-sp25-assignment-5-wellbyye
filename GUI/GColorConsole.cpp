@@ -4,77 +4,61 @@
 using namespace std;
 
 namespace {
-    /* HTML header and footer.*/
-    const string kHTMLHeader = R"(
+// Basic HTML structure used to display the colored console output in a browser-like GUI
+const string kHTMLHeader = R"(
          <html>
             <head></head>
             <body style="background-color:white;color:black;">
                 <pre>)";
 
-    const string kHTMLFooter = R"(</pre>
+const string kHTMLFooter = R"(</pre>
             </body>
         </html>
     )";
 }
 
+// Constructor sets up our stream to use a custom buffer.
 GColorConsole::GColorConsole() : ostream(new ConsoleStreambuf(this)) {
-    // Handled in initializer list
+    // All setup is done in initializer list
 }
 
+// Destructor safely deletes the stream buffer to avoid memory leaks
 GColorConsole::~GColorConsole() {
-    delete rdbuf();
+    delete rdbuf(); // this was allocated with new in the initializer list
 }
 
-/* Clears everything. This will not update the display until updateDisplay is called. */
+// Clears all displayed contents, but we wait to update the GUI until updateDisplay is called.
 void GColorConsole::clearDisplay() {
-    /* Kick out any remaining contents, then clear out the contents. */
-    flushBuffer();
-    mContents.clear();
+    flushBuffer();    // flush any current content to mContents
+    mContents.clear(); // then clear the stored lines
 }
 
-/* Whenever the streambuf is sync'ed, take the buffer contents and push them
- * into the list of contents.
- */
+// This function is triggered when stream needs to be synchronized (like flushing with endl)
 int GColorConsole::ConsoleStreambuf::sync() {
-    mOwner->updateDisplay();
+    mOwner->updateDisplay(); // tells the GUI to redraw everything
     return 0;
 }
 
-/* Kicks out all text stashed in the streambuf and adds it to the list of text items
- * to display.
- */
+// Flush any buffered stream output and append it to our stored output lines
 void GColorConsole::flushBuffer() {
-    /* Get the current contents of the buffer. If it's empty, we don't need to do
-     * anything.
-     */
     auto* buffer = static_cast<ConsoleStreambuf *>(rdbuf());
 
-    auto contents = buffer->str();
-    if (contents.empty()) return;
+    auto contents = buffer->str(); // get whatever was being written
+    if (contents.empty()) return;  // nothing to flush
 
-    /* Otherwise, clear the buffer and append this text. */
-    buffer->str("");
-    mContents.emplace_back(mStyle, contents);
+    buffer->str(""); // reset the buffer
+    mContents.emplace_back(mStyle, contents); // store the styled string
 }
 
-/* Syncs to the display.
- *
- * TODO: This takes time O(n) to construct the string to display. I doubt that's going to
- * be a huge problem given that we already have to do O(n) work to copy the characters
- * over to the display. Update this if it gets too slow?
- */
+// This function rebuilds the entire display as HTML and updates the GUI console
 void GColorConsole::updateDisplay() {
-    /* Flush anything in our buffer to make sure the contents array holds
-     * everything we need.
-     */
-    flushBuffer();
+    flushBuffer(); // Make sure all new text is added before rendering
 
-    /* Write all the contents. */
     stringstream toShow;
     toShow << kHTMLHeader;
 
     for (const auto& line: mContents) {
-        /* Introduce the style. */
+        // Open a span with style
         toShow << "<span style=\"";
         toShow << "color:" << line.first.color.toHTML() << ";";
         if (line.first.fontStyle & BOLD)   toShow << "font-weight:bold;";
@@ -82,30 +66,30 @@ void GColorConsole::updateDisplay() {
         toShow << "font-size:" << line.first.fontSize.size() << "pt;";
         toShow << "\">";
 
-        /* Write the text, escaping everything as needed. */
+        // Escape HTML-sensitive characters
         toShow << htmlEncode(line.second);
 
-        /* Close the style. */
-        toShow << "</span>";
+        toShow << "</span>"; // close style span
     }
 
-    /* Close it out. */
-    toShow << kHTMLFooter;
+    toShow << kHTMLFooter; // finish HTML structure
 
-    /* Change text contents and scroll down. */
+    // We need to do GUI updates on the main thread
     GThread::runOnQtGuiThread([&, this] {
-        setText(toShow.str());
-        scrollToBottom();
+        setText(toShow.str()); // replace the text content
+        scrollToBottom();      // scroll to the newest output
     });
 }
 
+// Set the current style (color, font style, size) for the output
 void GColorConsole::setStyle(MiniGUI::Color color, FontStyle style, FontSize size) {
-    flushBuffer();
+    flushBuffer(); // flush any text that was using the previous style
     mStyle.color = color;
     mStyle.fontStyle = style;
     mStyle.fontSize = size;
 }
 
+// Simple getter functions
 GColorConsole::FontStyle GColorConsole::style() const {
     return mStyle.fontStyle;
 }
@@ -116,37 +100,35 @@ FontSize GColorConsole::fontSize() const {
     return mStyle.fontSize;
 }
 
+// Temporarily change style for the duration of a function, then restore original style
 void GColorConsole::doWithStyle(MiniGUI::Color newColor, FontStyle newStyle, FontSize newSize, std::function<void ()> fn) {
+    // Save the current style
     auto oldColor = color();
     auto oldStyle = style();
     auto oldSize  = fontSize();
 
-    setStyle(newColor, newStyle, newSize);
+    setStyle(newColor, newStyle, newSize); // apply new style
 
-    /* Execute the given callback. If it throws, undo all our changes before returning. */
     try {
-        fn();
+        fn(); // call the user function using the new style
     } catch (...) {
-        setStyle(oldColor, oldStyle);
+        setStyle(oldColor, oldStyle); // restore if it fails
         throw;
     }
 
-    /* Hey, we succeeded! Roll back the styling. */
-    setStyle(oldColor, oldStyle, oldSize);
+    setStyle(oldColor, oldStyle, oldSize); // restore after function completes
 }
 
+// Overloads that allow calling doWithStyle with fewer arguments
 void GColorConsole::doWithStyle(MiniGUI::Color color, FontStyle style, std::function<void ()> fn) {
     doWithStyle(color, style, fontSize(), fn);
 }
-
 void GColorConsole::doWithStyle(MiniGUI::Color color, std::function<void ()> fn) {
     doWithStyle(color, style(), fontSize(), fn);
 }
-
 void GColorConsole::doWithStyle(FontStyle style, std::function<void ()> fn) {
     doWithStyle(color(), style, fontSize(), fn);
 }
-
 void GColorConsole::doWithStyle(FontStyle style, FontSize size, std::function<void()> fn) {
     doWithStyle(color(), style, size, fn);
 }
@@ -157,9 +139,9 @@ void GColorConsole::doWithStyle(FontSize size, std::function<void()> fn) {
     doWithStyle(color(), style(), size, fn);
 }
 
-/**** FontSize implementation. ****/
+// Simple wrapper class for font size
 FontSize::FontSize(size_t size): mSize(size) {
-    // Handled in initialization list
+    // constructor body not needed
 }
 
 size_t FontSize::size() const {

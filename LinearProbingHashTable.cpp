@@ -1,50 +1,123 @@
 #include "LinearProbingHashTable.h"
+#include "hashfunctions.h" // In case you use predefined hash functions
+#include "error.h"         // For reporting unexpected errors
 using namespace std;
 
-LinearProbingHashTable::LinearProbingHashTable(HashFunction<string> hashFn) {
-    /* TODO: Delete this comment and the next line, then implement this function. */
-    (void) hashFn;
+/* Initial capacity of the hash table (can be tuned). */
+static const int kInitialCapacity = 8;
+
+/* Special value representing a deleted slot (called a tombstone). */
+static const string kDeletedMarker = "<<deleted>>";
+
+LinearProbingHashTable::LinearProbingHashTable(HashFunction<string> hashFn)
+    : hashFn(hashFn), elems(0), tombstones(0), table(kInitialCapacity, "") {
+    // We initialize with empty strings to represent empty slots.
 }
 
 LinearProbingHashTable::~LinearProbingHashTable() {
-    /* TODO: Delete this comment, then implement this function. */
+    // Nothing to do — no raw pointers to delete!
 }
 
 int LinearProbingHashTable::size() const {
-    /* TODO: Delete this comment and the next lines, then implement this function. */
-    return -1;
+    return elems; // Only count *actual* elements, not tombstones
 }
 
 bool LinearProbingHashTable::isEmpty() const {
-    /* TODO: Delete this comment and the next lines, then implement this function. */
-    return false;
+    return size() == 0;
 }
 
 bool LinearProbingHashTable::insert(const string& elem) {
-    /* TODO: Delete this comment and the next lines, then implement this function. */
-    (void) elem;
-    return false;
+    // Rehash if the load factor (including tombstones) is too high
+    if ((elems + tombstones) >= table.size() * 0.5) {
+        rehash(table.size() * 2); // Grow and clean up table
+    }
+
+    int index = hashFn(elem) % table.size();
+    int firstTombstone = -1;
+
+    while (true) {
+        string& slot = table[index];
+
+        if (slot == "") {
+            // Found an empty spot to insert
+            if (firstTombstone != -1) {
+                table[firstTombstone] = elem;
+                tombstones--; // Reused a tombstone
+            } else {
+                slot = elem;
+            }
+            elems++;
+            return true;
+        } else if (slot == kDeletedMarker) {
+            // Remember the first tombstone to reuse later
+            if (firstTombstone == -1) firstTombstone = index;
+        } else if (slot == elem) {
+            return false; // Already present
+        }
+
+        index = (index + 1) % table.size(); // Linear probing
+    }
 }
 
 bool LinearProbingHashTable::contains(const string& elem) const {
-    /* TODO: Delete this comment and the next lines, then implement this function. */
-    (void) elem;
-    return false;
+    int index = hashFn(elem) % table.size();
+
+    while (true) {
+        const string& slot = table[index];
+        if (slot == "") return false; // Element not found
+        if (slot != kDeletedMarker && slot == elem) return true;
+        index = (index + 1) % table.size();
+    }
 }
 
 bool LinearProbingHashTable::remove(const string& elem) {
-    /* TODO: Delete this comment and the next lines, then implement this function. */
-    (void) elem;
-    return false;
+    int index = hashFn(elem) % table.size();
+
+    while (true) {
+        string& slot = table[index];
+        if (slot == "") return false; // Not found
+        if (slot != kDeletedMarker && slot == elem) {
+            slot = kDeletedMarker;
+            elems--;
+            tombstones++;
+            return true;
+        }
+        index = (index + 1) % table.size();
+    }
 }
 
+/* Helper function to rehash the table when it gets too full. */
+void LinearProbingHashTable::rehash(int newCapacity) {
+    Vector<string> oldTable = table;
+    table = Vector<string>(newCapacity, "");
+    elems = 0;
+    tombstones = 0;
+
+    for (const string& entry : oldTable) {
+        if (entry != "" && entry != kDeletedMarker) {
+            insert(entry); // Re-insert valid entries into new table
+        }
+    }
+}
 
 /* * * * * * Test Cases Below This Point * * * * * */
 #include "GUI/SimpleTest.h"
 
-/* Optional: Add your own custom tests here! */
+/* You can add your own custom tests here! */
 
+STUDENT_TEST("Basic insert, contains, remove") {
+    LinearProbingHashTable table(hashCode);
 
+    EXPECT_EQUAL(table.isEmpty(), true);
+    EXPECT_EQUAL(table.insert("apple"), true);
+    EXPECT_EQUAL(table.insert("banana"), true);
+    EXPECT_EQUAL(table.contains("apple"), true);
+    EXPECT_EQUAL(table.contains("banana"), true);
+    EXPECT_EQUAL(table.remove("apple"), true);
+    EXPECT_EQUAL(table.contains("apple"), false);
+    EXPECT_EQUAL(table.remove("banana"), true);
+    EXPECT_EQUAL(table.isEmpty(), true);
+}
 
 
 

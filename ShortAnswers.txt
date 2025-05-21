@@ -1,40 +1,74 @@
-Q1:
+Q1.
+Starting with an empty table of 10 slots (0 to 9), we insert the numbers one by one:
+- 31 hashes to 1 (last digit 1), so slot 1 gets 31.
+- 41 hashes to 1, but slot 1 is taken, so we try slot 2, which is empty, so 41 goes there.
+- 59 hashes to 9, slot 9 is empty, so 59 goes in slot 9.
+- 26 hashes to 6, slot 6 is empty, so 26 goes there.
+- 53 hashes to 3, slot 3 is empty, so 53 goes there.
+- 58 hashes to 8, slot 8 is empty, so 58 goes there.
+- 97 hashes to 7, slot 7 is empty, so 97 goes there.
+- 93 hashes to 3, but slot 3 has 53, so we check slot 4, which is empty, so 93 goes there.
 
+The table looks like this:
+0: .
+1: 31
+2: 41
+3: 53
+4: 93
+5: .
+6: 26
+7: 97
+8: 58
+9: 59
 
+Q2.
+We inserted 8 elements into a table with 10 slots, so the load factor α = 8/10 = 0.8.
 
+Q3.
+Yes, it’s possible to get a different table by inserting the same elements in a different order. For example, if we insert 58 before 53 and 93, the collisions and probing steps will change, leading to a different arrangement. So the order of insertion definitely affects the final table.
 
-Q2:
+Q4.
+To check if 72 is in the table from Q1, we hash 72 to slot 2 (last digit 2).
+- Slot 2 has 41, not 72, so we check the next slot 3, which has 53, not 72.
+- Then slot 4 has 93, not 72.
+- Slot 5 is empty, so we stop searching.
+So we look at slots 2, 3, 4, and 5.
 
+Q5.
+To check for 137, hash 137 to slot 7.
+- Slot 7 has 97, not 137, check slot 8: 58, not 137.
+- Slot 9: 59, no.
+- Slot 0: empty (.), so we stop.
+Slots checked: 7, 8, 9, 0.
 
+Q6.
+Removing 41 (at slot 2) and 53 (at slot 3) with tombstones means we mark those slots with 'T' instead of empty:
 
+0: .
+1: 31
+2: T
+3: T
+4: 93
+5: .
+6: 26
+7: 97
+8: 58
+9: 59
 
-Q3:
+Q7.
+Insert 106, 107, and 110 into the table with tombstones:
+- 106 hashes to 6, slot 6 has 26, move to 7: 97, 8: 58, 9: 59, 0: . So 0 is free, but before that, tombstones are at 2 and 3. We insert 106 at slot 2 (replacing tombstone).
+- 107 hashes to 7, slots 7,8,9,0 checked already. Slot 1 has 31, so next is slot 2 (now 106), slot 3 is tombstone, so insert 107 at slot 3.
+- 110 hashes to 0, slot 0 is free, so 110 goes there.
 
-
-
-
-Q4:
-
-
-
-
-Q5:
-
-
-
-
-Q6:
-
-
-
-
-Q7:
-
-
-
-
-
-
-
-
-
+Final table:
+0: 110
+1: 31
+2: 106
+3: 107
+4: 93
+5: .
+6: 26
+7: 97
+8: 58
+9: 59

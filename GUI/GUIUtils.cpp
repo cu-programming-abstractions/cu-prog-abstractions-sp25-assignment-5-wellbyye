@@ -69,32 +69,54 @@ shared_ptr<TextRender> TextRender::construct(const string& text,
                                              LineBreak breakMode) {
     /* Split the text apart into individual tokens. */
     auto tokens = tokenize(text);
+    /*
+ * Attempts to create a TextRender object that fits the provided text into the given bounds.
+ * If the font is too big to fit, it shrinks it until everything fits. Originally this was done
+ * using a simple while-loop that decreased the font size one point at a time (O(n)).
+ */
+    shared_ptr<TextRender> computeBestFitText(const Vector<string>& tokens,
+                                              const GRectangle& bounds,
+                                              Font font,
+                                              TextBreakMode breakMode) {
+        shared_ptr<TextRender> result(new TextRender());
+        result->mBounds = bounds;
+        result->mFont = font;
 
-    /* Keep trying to get things to fit, shrinking the font until we succeed.
-     *
-     * TODO: This is a silly O(n)-time algorithm. Use binary search instead?
-     */
-    shared_ptr<TextRender> result(new TextRender());
-    result->mBounds         = bounds;
-    result->mFont           = font;
-    result->mComputedFont   = font;
-    while (true) {
-        /* See if this works. */
-        if (result->fitText(tokens, breakMode)) break;
+        // Extract starting font size (in points)
+        int originalSize = static_cast<int>(font.pointSize());
+        int low = 1;
+        int high = originalSize;
+        int bestFitSize = 0;
 
-        /* Try reducing the font size. If we can't, then there's nothing to render, and
-         * that's okay!
-         */
-        if (!reduceFont(result->mComputedFont)) {
+        // Binary search for the largest font size that fits
+        while (low <= high) {
+            int mid = (low + high) / 2;
+            Font testFont(font.family(), mid, font.style());
+            result->mComputedFont = testFont;
+
+            if (result->fitText(tokens, breakMode)) {
+                // It fits! Try a larger font.
+                bestFitSize = mid;
+                low = mid + 1;
+            } else {
+                // Too big. Try a smaller font.
+                high = mid - 1;
+            }
+        }
+
+        // If bestFitSize is 0, we couldn't make anything fit. That's okay — just return empty bounds.
+        if (bestFitSize == 0) {
             result->mComputedBounds = {
                 result->mBounds.x, result->mBounds.y, 0, 0
             };
-            break;
+        } else {
+            // Set the font to the best size we found and recompute with it.
+            result->mComputedFont = Font(font.family(), bestFitSize, font.style());
+            result->fitText(tokens, breakMode); // Final re-layout
         }
-    }
 
-    return result;
-}
+        return result;
+    }
 
 /* Attempts to line wrap the text to fit it within the bounds rectangle. On success, returns true and
  * fills in the outparameters with information about the render. Otherwise, returns false and leaves

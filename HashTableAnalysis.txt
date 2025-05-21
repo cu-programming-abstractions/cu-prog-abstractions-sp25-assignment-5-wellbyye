@@ -1,24 +1,17 @@
-Q1:
+Q1.
+As the table gets fuller (load factor α goes up), there are more collisions, so the lookup has to check more spots in a row. That makes the lookup slower because it can’t just jump straight to the element.
 
+Q2.
+Unsuccessful lookups slow down faster than successful ones because when you don’t find the element, you have to keep probing until you hit an empty spot, which takes longer when the table is crowded.
 
+Q3.
+Successful deletions and lookups slow down at about the same rate because both need to find the item first by scanning through the same number of slots. Unsuccessful deletions and lookups also slow down similarly since they both have to scan until they find an empty slot. Basically, the amount of scanning each operation does is pretty much the same, so their slowdowns match as the table fills up.
 
+Q4.
+Setting the load factor super low like 0.01 might make things faster, but it wastes tons of memory because most of the table would be empty. That’s not really practical since you’d be using a lot more space than you need.
 
-Q2:
-
-
-
-
-Q3:
-
-
-
-
-Q4:
-
-
-
-
-Q5:
+Q5.
+I’d go with a linear probing hash table at about 0.5 load factor because it balances speed and memory pretty well. Linear probing benefits from good cache performance, so it’s usually faster than chaining, and keeping the load factor around 0.5 helps avoid long probe chains that slow things down.
 
 
 
